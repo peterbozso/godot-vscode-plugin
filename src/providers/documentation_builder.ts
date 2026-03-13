@@ -4,9 +4,10 @@ import * as Prism from "prismjs";
 import * as csharp from "prismjs/components/prism-csharp";
 import { marked } from "marked";
 import type { GodotNativeSymbol } from "./documentation_types";
-import { get_extension_uri } from "../utils";
+import { createLogger, get_extension_uri } from "../utils";
 import yabbcode = require("ya-bbcode");
 
+const log = createLogger("providers.docs_builder");
 const parser = new yabbcode();
 
 //! I do not understand why this is necessary
@@ -239,6 +240,7 @@ export function make_symbol_document(symbol: GodotNativeSymbol): string {
 			for (const s of symbol.children as GodotNativeSymbol[]) {
 				const elements = make_symbol_elements(s);
 				if (!elements) {
+					log.debug(`Unable to render symbol "${s.name}" (unhandled SymbolKind ${s.kind})`);
 					continue;
 				}
 				switch (s.kind) {

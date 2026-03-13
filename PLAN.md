@@ -195,7 +195,7 @@ All changes in `src/providers/documentation_builder.ts`:
 
 2. **Main loop in `make_symbol_document()` (line ~257):** Added `SymbolKind.Constructor` and `SymbolKind.Operator` cases alongside `Method`/`Function`, so constructor and operator children are grouped into the methods index and methods description sections of the rendered doc page.
 
-3. **Null guard (line ~242):** Added `if (!elements) { continue; }` after the `make_symbol_elements(s)` call in the children loop. This is a defensive measure so that any future unhandled `SymbolKind` values (or failed regex parses) skip gracefully instead of crashing the entire doc page with a `TypeError` on `.body` / `.index` access.
+3. **Null guard with debug log (line ~242):** Added a null check on the `make_symbol_elements(s)` return value. When `elements` is `undefined` (unhandled `SymbolKind` or failed regex parse), the code logs a debug message via `createLogger("providers.docs_builder")` — e.g. `Unable to render symbol "some_op" (unhandled SymbolKind 25)` — and skips the child. The doc page still opens without crashing. This follows the same logging pattern as all other providers in the project (tag-only `createLogger`, no `output` option — logs go to `console.log` when `VSCODE_DEBUG_MODE=true`, visible in the Debug Console of the host VS Code during extension development). Verified working by temporarily commenting out the Constructor case and observing the log.
 
 **Verification:** `npx tsc --noEmit` passes cleanly. `SymbolKind.Constructor` (9) and `SymbolKind.Operator` (25) are confirmed to exist in the `vscode-languageserver-types` package used by this project.
 
