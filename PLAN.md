@@ -148,20 +148,34 @@ Godot's LSP resolves method lookups through `_lookup_symbol_from_base()` (`gdscr
 
 The `parse_hover_result()` regex `/(?:func|const) (@?\w+)\.(\w+)/` would correctly extract `TileMapLayer` as `match[1]`, producing the correct gddoc URI.
 
-### Possible explanations for the reported misbehavior
+### Confirmed root cause (verified with LSP traffic capture)
 
-1. **Untyped variable:** If the variable is declared as `var layer = $TileMapLayer` without a type annotation, and type inference fails or resolves to a parent type, the method lookup could start from a different class.
-2. **Deprecated API confusion:** `TileMap` is deprecated since Godot 4.3 in favor of `TileMapLayer`. If the user actually had a `TileMap` variable, navigation to `TileMap`'s docs would be correct behavior.
-3. **Version-specific issue:** In transitional Godot versions, `TileMapLayer` might not have had `set_cell` registered in `ClassDB` yet, causing the method lookup to fail entirely and fall back to smart_resolve, which could match `TileMap.set_cell` first.
-4. **Smart resolve fallback:** If `resolve_symbol()` returns `nullptr` (because `lookup_code` fails), Godot's hover handler falls back to `resolve_related_symbols()` which does a global fuzzy search across ALL native members. If `TileMap.set_cell` appears before `TileMapLayer.set_cell` in this search, it would be returned first. The response in this case is an array (not a MarkupContent object), and `parse_hover_result()` takes `contents[0]`, which would be the first match.
+The variable in the test project is **untyped** (`var layer = $TileMapLayer`, no type annotation). This causes a specific failure chain:
+
+1. `resolve_symbol()` in Godot's LSP calls `lookup_code()`, which fails to resolve the type of the untyped variable → returns `nullptr`.
+2. Godot's `hover()` handler falls back to the **smart_resolve** path (`resolve_related_symbols()`), which does a global fuzzy search across ALL native class members for any method named `set_cell`.
+3. The response `contents` is an **Array** (not a MarkupContent object) containing ALL matches:
+   - `contents[0]`: `"\tfunc TileMap.set_cell(layer: int, coords: Vector2i, ...) -> void\n\n..."`
+   - `contents[1]`: `"\tfunc TileMapLayer.set_cell(coords: Vector2i, ...) -> void\n\n..."`
+   - `contents[2]`: `"\tfunc TileMapPattern.set_cell(coords: Vector2i, ...) -> void\n\n..."`
+4. `parse_hover_result()` (`GDScriptLanguageClient.ts:326`) checks `Array.isArray(contents)` and blindly takes `contents[0]` — the first match, which is `TileMap.set_cell`.
+5. The definition navigates to `TileMap`'s doc page instead of `TileMapLayer`'s.
+
+Meanwhile, hovering over the `TileMapLayer` class name itself resolves correctly (single MarkupContent result: `<Native> class TileMapLayer extends Node2D`), which is why the tooltip shows the right class.
+
+**Two separate problems contribute:**
+- **Godot LSP side:** `resolve_symbol()` fails to infer the type of `$TileMapLayer` without a type annotation, triggering the smart_resolve fallback. This is a type inference limitation.
+- **Extension side:** `parse_hover_result()` takes `contents[0]` when smart_resolve returns an array, with no logic to pick the best match. The array order appears to be alphabetical or insertion-order by class name, so `TileMap` comes before `TileMapLayer`.
+
+**Workaround:** Adding a type annotation (`var layer: TileMapLayer = $TileMapLayer`) would allow `resolve_symbol()` to succeed on the primary path, avoiding the smart_resolve fallback entirely.
 
 ### Relationship to Bug 1
 
 The TileMap/TileMapLayer issue is **independent** of the gddoc crash bug. They have entirely different root causes:
 - **Bug 1** (gddoc crash): Extension-side rendering crash in `documentation_builder.ts` — unhandled SymbolKinds and restrictive property name regex.
-- **TileMap issue**: LSP-side symbol resolution returning the wrong class for a method call, possibly due to smart_resolve fallback or type inference failure.
+- **TileMap issue**: Godot LSP type inference failure + extension blindly picking `contents[0]` from smart_resolve results.
 
-Fixing Bug 1 will NOT fix the TileMap issue, and vice versa. They can be addressed independently. However, once Bug 1 is fixed, the TileMap issue may become easier to diagnose because the docs page for `TileMapLayer` will actually open (currently it might also crash due to Bug 1 if `TileMapLayer` has any children with unhandled kinds).
+Fixing Bug 1 will NOT fix the TileMap issue, and vice versa. They can be addressed independently. However, once Bug 1 is fixed, the TileMap issue may become easier to diagnose because the docs page for `TileMapLayer` will actually open (currently it also crashes due to Bug 1 since `TileMapLayer` has Constructor/Operator children).
 
 ---
 
@@ -180,7 +194,8 @@ Fixing Bug 1 will NOT fix the TileMap issue, and vice versa. They can be address
 
 ### For the TileMap/TileMapLayer issue
 
-Further investigation is needed. Potential approaches:
-1. **Reproduce with debugging:** Set up a test project with a typed `TileMapLayer` variable and log the actual hover response to confirm whether the LSP returns the correct class.
-2. **If smart_resolve is the culprit:** The fix would be Godot-engine-side, in how `resolve_related_symbols()` prioritizes matches when the same method name exists on multiple classes.
-3. **If the definition provider should use `textDocument/definition` instead of `textDocument/hover`:** This would be a larger refactor of `GDDefinitionProvider` but would be more correct architecturally, as the hover hack loses information that the LSP's definition response preserves.
+Root cause confirmed via LSP traffic capture. Two independent fixes are possible:
+
+1. **Extension-side (partial fix):** When `parse_hover_result()` receives an array from smart_resolve, instead of blindly taking `contents[0]`, apply heuristics to pick the best match — e.g., prefer non-deprecated classes, or try to infer the receiver type from context. This would be fragile but would improve the common case.
+2. **Godot LSP side (proper fix):** Improve type inference in `resolve_symbol()` / `lookup_code()` so that `$TileMapLayer` (or `get_node("TileMapLayer")`) correctly infers the `TileMapLayer` type even without an explicit annotation. This would avoid the smart_resolve fallback entirely.
+3. **Architectural improvement:** Refactor `GDDefinitionProvider` to use `textDocument/definition` (or `textDocument/declaration`) instead of the `textDocument/hover` hack. The definition/declaration handlers in Godot's LSP have a dedicated native symbol fallback path that is more correct than parsing hover text with regexes. This is a larger change but eliminates the entire class of hover-parsing bugs.
