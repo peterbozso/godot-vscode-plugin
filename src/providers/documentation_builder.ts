@@ -293,10 +293,10 @@ export function make_symbol_document(symbol: GodotNativeSymbol): string {
 
 		add_group("Properties", properties_index);
 		add_group("Constructors", constructors_index);
-		add_group("Constants", constants);
-		add_group("Signals", signals);
 		add_group("Methods", methods_index);
 		add_group("Operators", operators_index);
+		add_group("Signals", signals);
+		add_group("Constants", constants);
 		add_group("Property Descriptions", propertyies);
 		add_group("Constructor Descriptions", constructors);
 		add_group("Method Descriptions", methods);
