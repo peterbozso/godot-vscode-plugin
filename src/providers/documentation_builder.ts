@@ -121,6 +121,10 @@ export function make_html_content(webview: vscode.Webview, symbol: GodotNativeSy
 export function make_symbol_document(symbol: GodotNativeSymbol): string {
 	const classlink = make_link(symbol.native_class, undefined);
 
+	function make_symbol_id(name: string) {
+		return name.replace(/[^A-Za-z0-9_-]/g, "_");
+	}
+
 	function make_function_signature(s: GodotNativeSymbol, with_class = false) {
 		const parts = /\((.*)?\)\s*\-\>\s*(([A-z0-9]+)?)$/.exec(s.detail);
 		if (!parts) {
@@ -133,7 +137,7 @@ export function make_symbol_document(symbol: GodotNativeSymbol): string {
 		);
 		args = args.replace(/\s=\s(.*?)[\,\)]/g, "");
 		return `${ret_type} ${with_class ? `${classlink}.` : ""}${element("a", s.name, {
-			href: `#${s.name}`,
+			href: `#${make_symbol_id(s.name)}`,
 		})}( ${args} )`;
 	}
 
@@ -147,7 +151,7 @@ export function make_symbol_document(symbol: GodotNativeSymbol): string {
 					return;
 				}
 				const type = make_link(parts[2], undefined);
-				const name = element("a", s.name, { href: `#${s.name}` });
+				const name = element("a", s.name, { href: `#${make_symbol_id(s.name)}` });
 				const title = element("h4", `${type} ${with_class ? `${classlink}.` : ""}${s.name}`);
 				const doc = element("p", format_documentation(s.documentation, symbol.native_class));
 				const div = element("div", title + doc);
@@ -230,8 +234,12 @@ export function make_symbol_document(symbol: GodotNativeSymbol): string {
 
 		let constants = "";
 		let signals = "";
+		let constructors_index = "";
+		let constructors = "";
 		let methods_index = "";
 		let methods = "";
+		let operators_index = "";
+		let operators = "";
 		let properties_index = "";
 		let propertyies = "";
 		let others = "";
@@ -243,27 +251,34 @@ export function make_symbol_document(symbol: GodotNativeSymbol): string {
 					log.debug(`Unable to render symbol "${s.name}" (unhandled SymbolKind ${s.kind})`);
 					continue;
 				}
+				const id = make_symbol_id(s.name);
 				switch (s.kind) {
 					case SymbolKind.Property:
 					case SymbolKind.Variable:
 						properties_index += element("li", elements.index);
-						propertyies += element("li", elements.body, { id: s.name });
+						propertyies += element("li", elements.body, { id });
 						break;
 					case SymbolKind.Constant:
-						constants += element("li", elements.body, { id: s.name });
+						constants += element("li", elements.body, { id });
 						break;
 					case SymbolKind.Event:
-						signals += element("li", elements.body, { id: s.name });
+						signals += element("li", elements.body, { id });
+						break;
+					case SymbolKind.Constructor:
+						constructors_index += element("li", elements.index);
+						constructors += element("li", elements.body, { id });
 						break;
 					case SymbolKind.Method:
 					case SymbolKind.Function:
-					case SymbolKind.Constructor:
-					case SymbolKind.Operator:
 						methods_index += element("li", elements.index);
-						methods += element("li", elements.body, { id: s.name });
+						methods += element("li", elements.body, { id });
+						break;
+					case SymbolKind.Operator:
+						operators_index += element("li", elements.index);
+						operators += element("li", elements.body, { id });
 						break;
 					default:
-						others += element("li", elements.body, { id: s.name });
+						others += element("li", elements.body, { id });
 						break;
 				}
 			}
@@ -277,11 +292,15 @@ export function make_symbol_document(symbol: GodotNativeSymbol): string {
 		};
 
 		add_group("Properties", properties_index);
+		add_group("Constructors", constructors_index);
 		add_group("Constants", constants);
 		add_group("Signals", signals);
 		add_group("Methods", methods_index);
+		add_group("Operators", operators_index);
 		add_group("Property Descriptions", propertyies);
+		add_group("Constructor Descriptions", constructors);
 		add_group("Method Descriptions", methods);
+		add_group("Operator Descriptions", operators);
 		add_group("Other Members", others);
 		doc += element("script", `var godot_class = "${symbol.native_class}";`);
 
