@@ -119,6 +119,20 @@ var ProjectSettings.application/boot_splash/bg_color: Color
 
 The regex character class `[A-z_0-9]` does **not** match `/` (ASCII 47 is outside the `A`=65 to `z`=122 range). So `parts` is `null`, the function returns `undefined`, and the caller crashes on `elements.index` (line 242) with a similar TypeError.
 
+**Post-Bug 1 fix behavior:** After the null guard was added for Bug 1, the crash no longer occurs — properties that fail the regex are silently skipped. However, the page now renders with **hundreds of properties missing**. Only ~60 platform-override properties (those with `.platform` suffixes like `.debug`, `.web`, `.mobile`, `.macos`) are shown, because the regex accidentally works for those: it matches the *last* `.` in the detail string.
+
+For example, `var ProjectSettings.application/run/flush_stdout_on_print.debug: bool`:
+- The regex matches `.debug: bool` (the last `.` before `: type`)
+- Captures `debug` as `parts[1]` (which is never used — display uses `s.name`)
+- Captures `bool` as `parts[2]` (the type) — correct
+
+But for normal properties without a `.platform` suffix, like `var ProjectSettings.application/config/name: String`:
+- The only `.` is after `ProjectSettings`
+- `[A-z_0-9]+` matches `application` then hits `/` and stops
+- No `:\s` follows → regex fails → `undefined` → skipped by null guard
+
+So the rendered page looks plausible (60 properties is still a lot) but is silently missing the vast majority of `ProjectSettings` members.
+
 ### Both bugs share the same underlying pattern
 
 `make_symbol_elements()` can return `undefined` in two ways:
