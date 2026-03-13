@@ -10,6 +10,8 @@
 
 Ctrl/Cmd+Click ("Go to Definition") on built-in Godot type names (e.g. `ProjectSettings`, `String`, `int`, `float`, `Vector2i`) fails with errors. The extension cannot resolve the `gddoc:` URI scheme for these types. Hover tooltips work correctly — only navigation/opening the doc page is broken.
 
+**IMPORTANT:** Navigation fails only for **SOME** built-in types. For `Node`, `Node2D` or `Input` it works just fine, for example.
+
 ## Error Chain
 
 Three errors occur in sequence when trying to open a native type's documentation:
@@ -20,7 +22,7 @@ Three errors occur in sequence when trying to open a native type's documentation
 
 ## Affected Types
 
-Reporters have confirmed this happens with: `ProjectSettings`, `String`, `int`, `float`, `Vector2i`, and methods on native types. Essentially any built-in/native Godot class.
+Reporters have confirmed this happens with: `ProjectSettings`, `String`, `int`, `float`, `Vector2i`.
 
 ## Key Observations from Comments
 
@@ -50,5 +52,5 @@ Reporters have confirmed this happens with: `ProjectSettings`, `String`, `int`, 
 ## Reproduction Steps
 
 1. Open any Godot project in VS Code with the godot-tools extension.
-2. Hover over a built-in type like `String`, `int`, or `Vector2i` — tooltip works fine.
+2. Hover over some built-in types like `String`, `int`, or `Vector2i` — tooltip works fine.
 3. Ctrl/Cmd+Click on the same type name — error occurs, no documentation opens.
