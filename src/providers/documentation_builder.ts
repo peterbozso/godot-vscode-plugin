@@ -146,7 +146,8 @@ export function make_symbol_document(symbol: GodotNativeSymbol): string {
 			case SymbolKind.Property:
 			case SymbolKind.Variable: {
 				// var Control.anchor_left: float
-				const parts = /\.([A-z_0-9]+)\:\s(.*)$/.exec(s.detail);
+				// var ProjectSettings.application/config/name: String
+				const parts = /\.([^:]+)\:\s(.*)$/.exec(s.detail);
 				if (!parts) {
 					return;
 				}

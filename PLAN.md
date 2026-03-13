@@ -215,10 +215,14 @@ All changes in `src/providers/documentation_builder.ts`:
 
 **Verification:** `npx tsc --noEmit` passes cleanly. `SymbolKind.Constructor` (9) and `SymbolKind.Operator` (25) are confirmed to exist in the `vscode-languageserver-types` package used by this project.
 
-### For Bug 2 (ProjectSettings property regex)
+### For Bug 2 (ProjectSettings property regex) — DONE
 
-**Fix in `src/providers/documentation_builder.ts`:**
+**Planned fix in `src/providers/documentation_builder.ts`:**
 1. Broaden the property name regex from `[A-z_0-9]+` to also match `/` (and potentially other special characters that appear in Godot property names). For example: `[A-Za-z_0-9/]+` or `[^:]+` (match everything up to the colon).
+
+**What was done:**
+
+Changed the property name regex in `make_symbol_elements()` for `Property`/`Variable` kinds (line ~149) from `/\.([A-z_0-9]+)\:\s(.*)$/` to `/\.([^:]+)\:\s(.*)$/`. The new regex uses `[^:]+ ` (match everything up to the colon) instead of `[A-z_0-9]+`, so it handles property names with `/`, `.`, or any other special characters. This matches all `ProjectSettings` properties like `application/config/name`, `display/window/size/viewport_width`, and platform-override properties like `application/run/flush_stdout_on_print.debug`. Since `parts[1]` (the captured property name) is never used in the rendering code (the display uses `s.name` directly), the broader capture is safe.
 
 ### For the TileMap/TileMapLayer issue
 
