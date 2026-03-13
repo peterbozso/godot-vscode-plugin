@@ -193,7 +193,9 @@ export function make_symbol_document(symbol: GodotNativeSymbol): string {
 				};
 			}
 			case SymbolKind.Method:
-			case SymbolKind.Function: {
+			case SymbolKind.Function:
+			case SymbolKind.Constructor:
+			case SymbolKind.Operator: {
 				const signature = make_function_signature(s, with_class);
 				const title = element("h4", signature);
 				const doc = element("p", format_documentation(s.documentation, symbol.native_class));
@@ -236,6 +238,9 @@ export function make_symbol_document(symbol: GodotNativeSymbol): string {
 		if (symbol.children) {
 			for (const s of symbol.children as GodotNativeSymbol[]) {
 				const elements = make_symbol_elements(s);
+				if (!elements) {
+					continue;
+				}
 				switch (s.kind) {
 					case SymbolKind.Property:
 					case SymbolKind.Variable:
@@ -250,6 +255,8 @@ export function make_symbol_document(symbol: GodotNativeSymbol): string {
 						break;
 					case SymbolKind.Method:
 					case SymbolKind.Function:
+					case SymbolKind.Constructor:
+					case SymbolKind.Operator:
 						methods_index += element("li", elements.index);
 						methods += element("li", elements.body, { id: s.name });
 						break;

@@ -181,11 +181,23 @@ Fixing Bug 1 will NOT fix the TileMap issue, and vice versa. They can be address
 
 ## Fix Strategy
 
-### For Bug 1 (Crash on Constructor/Operator children)
+### For Bug 1 (Crash on Constructor/Operator children) — DONE
 
-**Primary fix in `src/providers/documentation_builder.ts`:**
+**Planned fix in `src/providers/documentation_builder.ts`:**
 1. Add `SymbolKind.Constructor` (9) and `SymbolKind.Operator` (25) cases to both the `make_symbol_elements()` switch and the main loop in `make_symbol_document()`. Since their `detail` format is identical to methods (`"func ClassName.name(args) -> RetType"`), they can reuse the existing method-rendering code.
 2. Add a null guard on the `make_symbol_elements()` return value in the main loop (defensive fix).
+
+**What was done:**
+
+All changes in `src/providers/documentation_builder.ts`:
+
+1. **`make_symbol_elements()` switch (line ~197):** Added `SymbolKind.Constructor` and `SymbolKind.Operator` as fall-through cases to the existing `SymbolKind.Method` / `SymbolKind.Function` branch. Constructors and operators share the same `detail` format (`"func ClassName.name(args) -> RetType"`), so the existing `make_function_signature()` rendering works without modification.
+
+2. **Main loop in `make_symbol_document()` (line ~257):** Added `SymbolKind.Constructor` and `SymbolKind.Operator` cases alongside `Method`/`Function`, so constructor and operator children are grouped into the methods index and methods description sections of the rendered doc page.
+
+3. **Null guard (line ~242):** Added `if (!elements) { continue; }` after the `make_symbol_elements(s)` call in the children loop. This is a defensive measure so that any future unhandled `SymbolKind` values (or failed regex parses) skip gracefully instead of crashing the entire doc page with a `TypeError` on `.body` / `.index` access.
+
+**Verification:** `npx tsc --noEmit` passes cleanly. `SymbolKind.Constructor` (9) and `SymbolKind.Operator` (25) are confirmed to exist in the `vscode-languageserver-types` package used by this project.
 
 ### For Bug 2 (ProjectSettings property regex)
 
